@@ -1,0 +1,167 @@
+{
+  "$schema-template": "1.0.0",
+  "modulesContent": {
+    "$edgeAgent": {
+      "properties.desired": {
+        "schemaVersion": "1.0",
+        "runtime": {
+          "type": "docker",
+          "settings": {
+            "minDockerVersion": "v1.25",
+            "loggingOptions": "",
+            "registryCredentials": {
+              "wegbbiotmoduleregistry": {
+                "username": "$CONTAINER_REGISTRY_USERNAME_moduleregistry",
+                "password": "$CONTAINER_REGISTRY_PASSWORD_moduleregistry",
+                "address": "$CONTAINER_REGISTRY_ADDRESS_moduleregistry"
+              }
+            }
+          }
+        },
+        "systemModules": {
+          "edgeAgent": {
+            "type": "docker",
+            "settings": {
+              "image": "mcr.microsoft.com/azureiotedge-agent:1.0",
+              "createOptions": {}
+            }
+          },
+          "edgeHub": {
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "env": {
+              "OptimizeForPerformance": {
+                "value": "false"
+              }
+            },
+            "settings": {
+              "image": "mcr.microsoft.com/azureiotedge-hub:1.0",
+              "createOptions": {
+                "HostConfig": {
+                  "PortBindings": {
+                    "5671/tcp": [
+                      {
+                        "HostPort": "5671"
+                      }
+                    ],
+                    "8883/tcp": [
+                      {
+                        "HostPort": "8883"
+                      }
+                    ],
+                    "443/tcp": [
+                      {
+                        "HostPort": "443"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "modules": {
+          "tempSensor": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "mcr.microsoft.com/azureiotedge-simulated-temperature-sensor:1.0",
+              "createOptions": {}
+            }
+          },
+          "MQTTBrokerModule": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "eclipse-mosquitto:latest",
+              "createOptions": {
+                "ExposedPorts": {
+                  "1883/tcp": {},
+                  "9001/tcp": {}
+                },
+                "HostConfig": {
+                  "PortBindings": {
+                    "1883/tcp": [
+                      {
+                        "HostPort": "1883"
+                      }
+                    ],
+                    "9001/tcp": [
+                      {
+                        "HostPort": "9001"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "MQTTPublishModule": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "${MODULES.MQTTPublishModule}",
+              "createOptions": {}
+            }
+          },
+          "MQTTSubscribeModule": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "${MODULES.MQTTSubscribeModule}",
+              "createOptions": {}
+            }
+          },
+          "IoTHubEventsModule": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "${MODULES.IoTHubEventsModule}",
+              "createOptions": {}
+            }
+          }
+        }
+      }
+    },
+    "$edgeHub": {
+      "properties.desired": {
+        "schemaVersion": "1.0",
+        "routes": {
+          "sensorToMQTTClientModule": "FROM /messages/modules/tempSensor/outputs/temperatureOutput INTO BrokeredEndpoint(\"/modules/MQTTPublishModule/inputs/tempSensor\")",
+          "IoTHubEventsModuleToMQTTPublish": "FROM /messages/modules/IoTHubEventsModule/outputs/* INTO BrokeredEndpoint(\"/modules/MQTTPublishModule/inputs/iothub\")",
+          "MQTTSubscribeModuleToIoTHub": "FROM /messages/modules/MQTTSubscribeModule/outputs/* INTO $upstream"
+        },
+        "storeAndForwardConfiguration": {
+          "timeToLiveSecs": 7200
+        }
+      }
+    },
+    "MQTTPublishModule": {
+      "properties.desired": {
+        "MQTTBroker": "$MQTT_Broker"
+      }
+    },
+    "MQTTSubscribeModule": {
+      "properties.desired": {
+        "MQTTBroker": "$MQTT_Broker",
+        "Topic": "$MQTT_Subscribe_Topic"
+      }
+    },
+    "IoTHubEventsModule": {
+      "properties.desired": {
+        "IoTHubConnectionstring": "$IOTHUB_Service_ConnectionString"
+      }
+    }
+  }
+}
